@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Quizbot</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+        .chat-container {
+            max-width: 400px;
+            margin: 0 auto;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 10px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+        .chat-messages {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            height: 400px;
+            overflow-y: scroll;
+        }
+        .message {
+            display: flex;
+            margin-bottom: 10px;
+        }
+        .user-message {
+            justify-content: flex-end;
+        }
+        .bot-message {
+            justify-content: flex-start;
+        }
+        .message-text {
+            background-color: #f0f0f0;
+            border-radius: 15px;
+            padding: 8px 15px;
+            max-width: 70%;
+        }
+        .user-message .message-text {
+            background-color: #e1e1e1;
+            color: #333;
+        }
+        .input-container {
+            display: flex;
+            margin-top: 10px;
+        }
+        .input-box {
+            flex: 1;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            padding: 8px 15px;
+            outline: none;
+            background-color: #f0f0f0;
+            color: #333;
+        }
+        .send-button {
+            background-color: #777;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 15px;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        .reset-button {
+            background-color: #c9302c;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            padding: 8px 15px;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        .reset-button:hover {
+            background-color: #c9302c;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <ul class="chat-messages" id="chat-messages">
+            {% for message in request.session.message_history %}
+                {% if message.is_user %}
+                    <li class="message user-message">
+                {% else %}
+                    <li class="message bot-message">
+                {% endif %}
+                    <div class="message-text">{{ message.text }}</div>
+                </li>
+            {% endfor %}
+        </ul>
+        <div class="input-container">
+            <input type="text" class="input-box" id="input-box" placeholder="Type your message..." autofocus>
+            <button class="send-button" id="send-button">Send</button>
+            <button class="reset-button" id="reset-button">Reset</button>
+        </div>
+    </div>
+    <script>
+        const chatSocket = new WebSocket(
+            'ws://' + window.location.host + '/chat/'
+        );
+
+        chatSocket.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            addMessage(data.text, data.is_user);
+        };
+
+        chatSocket.onclose = function(e) {
+            console.error('Chat socket closed unexpectedly');
+        };
+
+        document.querySelector('#input-box').focus();
+         // Enable/Disable Send button based on the input field value
+    document.querySelector('#input-box').onkeyup = function(e) {
+        const userMessage = document.querySelector('#input-box').value.trim();
+        // Enable or disable the Send button based on input
+        document.querySelector('#send-button').disabled = !userMessage;
+        if (e.keyCode === 13) {  // enter, return key
+            document.querySelector('#send-button').click();
+        }
+    };
+
+    document.querySelector('#send-button').onclick = function(e) {
+        const inputBox = document.getElementById('input-box');
+        const userMessage = inputBox.value.trim();
+        if (!userMessage) {
+            return;  // Don't send if input is empty
+        }
+        chatSocket.send(JSON.stringify({
+            'message': userMessage
+        }));
+        inputBox.value = ''; // Clear input after sending
+        // Disable the Send button again until the user types something
+        document.querySelector('#send-button').disabled = true;
+    };
+
+    // Reset functionality
+    document.querySelector('#reset-button').onclick = function(e) {
+        const inputBox = document.getElementById('input-box');
+        inputBox.value = '/reset';
+        document.querySelector('#send-button').click();
+        location.reload(); // Reload the page
+    };
+
+    // Function to add a new message to the chat container
+    function addMessage(text, isUser = false) {
+        const chatMessages = document.getElementById('chat-messages');
+        const messageClass = isUser ? 'user-message' : 'bot-message';
+        const messageText = `
+            <li class="message ${messageClass}">
+                <div class="message-text">${text}</div>
+            </li>
+        `;
+        chatMessages.insertAdjacentHTML('beforeend', messageText);
+    }
+</script>
+</body>
+</html>
